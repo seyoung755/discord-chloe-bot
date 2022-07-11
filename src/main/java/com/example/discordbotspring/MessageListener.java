@@ -41,6 +41,9 @@ public class MessageListener extends ListenerAdapter {
             TextChannel textChannel = event.getGuild().getTextChannelsByName("✅체크인-체크아웃", true).get(0);
 
             textChannel.sendMessage("체크인/체크아웃 알림을 시작합니다.").queue();
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
+            Calendar instance = Calendar.getInstance();
+            System.out.println(instance.getTimeZone());
 
             Calendar calendar = Calendar.getInstance();
 
