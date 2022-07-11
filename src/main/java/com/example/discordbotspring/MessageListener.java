@@ -96,8 +96,8 @@ public class MessageListener extends ListenerAdapter {
             Timer timer = new Timer();
 
             //Use this if you want to execute it once
-            timer.scheduleAtFixedRate(checkInTask, checkIn, 1000*60*1*1);
-            timer.scheduleAtFixedRate(checkOutTask, checkOut, 1000*60*1*1);
+            timer.scheduleAtFixedRate(checkInTask, checkIn, 1000*60*60*24);
+            timer.scheduleAtFixedRate(checkOutTask, checkOut, 1000*60*60*24);
         }
     }
 
