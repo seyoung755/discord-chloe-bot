@@ -84,10 +84,11 @@ public class MessageListener extends ListenerAdapter {
 
             Date checkIn = null;
             Date checkOut = null;
+            LocalDateTime runtime = LocalDateTime.now();
 
             try {
-                checkIn = dateFormatter.parse("2022-07-12 10:00:00");
-                checkOut = dateFormatter.parse("2022-07-12 18:00:00");
+                checkIn = dateFormatter.parse(runtime.toString().substring(0, 10) + " 02:22:30");
+                checkOut = dateFormatter.parse(runtime.toString().substring(0, 10) + " 18:00:00");
             } catch (ParseException e) {
                 e.printStackTrace();
             }
