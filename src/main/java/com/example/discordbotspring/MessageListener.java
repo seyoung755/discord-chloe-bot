@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentMap;
 public class MessageListener extends ListenerAdapter {
     public static final String BOT_START_COMMAND = "!클로이봇 시작";
     private static final Logger logger = LoggerFactory.getLogger(MessageListener.class);
+    public static final String BOT_STOP_COMMAND = "!클로이봇 종료";
     private final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     public static final String CHECK_OUT_MODE = "체크아웃";
     public static final String CHECK_IN_MODE = "체크인";
@@ -30,12 +31,11 @@ public class MessageListener extends ListenerAdapter {
     public static final String STATUS_COMMAND = "!상태";
     public static final int ONE_DAY_IN_MILLISECONDS = 1000 * 60 * 60 * 24;
 
-    private static JDA jda;
-    private static ConcurrentMap<String, String> guilds = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<String, String> guilds = new ConcurrentHashMap<>();
 
     public static void run() throws LoginException {
         String token = System.getenv("TOKEN");
-        jda = JDABuilder.createDefault(token).build();
+        JDA jda = JDABuilder.createDefault(token).build();
         jda.getPresence().setStatus(OnlineStatus.ONLINE);
         jda.addEventListener(new MessageListener());
     }
@@ -49,25 +49,41 @@ public class MessageListener extends ListenerAdapter {
                         doSendAlreadyRunMessage(event);
                         break;
                     }
-                    doRunChloeBot(event);
+                    runChloeBot(event);
                 }
                 break;
 
             case STATUS_COMMAND:
-                doStatusCheck(event);
+                checkStatus(event);
                 break;
+
+            case BOT_STOP_COMMAND:
+                stopChloeBot(event);
+                break;
+
+            default:
+                // do nothing
         }
+    }
+
+    private void stopChloeBot(MessageReceivedEvent event) {
+        disableGuild(event.getGuild());
+        event.getTextChannel().sendMessage("체크인/체크아웃 알림을 종료합니다.").queue();
+    }
+
+    private void disableGuild(Guild guild) {
+        guilds.remove(guild.getName());
     }
 
     private void doSendAlreadyRunMessage(@NotNull MessageReceivedEvent event) {
         event.getTextChannel().sendMessage("이미 체크인/체크아웃 알림이 등록되었습니다.").queue();
     }
 
-    private void doStatusCheck(@NotNull MessageReceivedEvent event) {
+    private void checkStatus(@NotNull MessageReceivedEvent event) {
         event.getTextChannel().sendMessage("정상 작동중입니다. 봇의 주인 : " + System.getProperty("user.name")).queue();
     }
 
-    private void doRunChloeBot(@NotNull MessageReceivedEvent event) {
+    private void runChloeBot(@NotNull MessageReceivedEvent event) {
 
         setTimeZone();
         Guild guild = event.getGuild();
@@ -114,7 +130,7 @@ public class MessageListener extends ListenerAdapter {
             cal.add(Calendar.DAY_OF_YEAR, 1);
         }
 
-        logger.info("time: {}", cal.getTime().toString());
+        logger.info("time: {}", cal.getTime());
 
         return cal.getTime();
     }
@@ -147,7 +163,7 @@ public class MessageListener extends ListenerAdapter {
                 String month = dateString.substring(5, 7);
                 String day = dateString.substring(8, 10);
                 textChannel.sendMessage(month + "월 " + day + "일 " + mode +
-                        "시간입니다~ 스레드에 체크인 댓글을 남겨주세요!");
+                        "시간입니다~ 스레드에 체크인 댓글을 남겨주세요!").queue();
             }
         };
     }
