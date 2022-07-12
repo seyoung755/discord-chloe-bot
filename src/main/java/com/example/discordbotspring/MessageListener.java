@@ -22,16 +22,19 @@ import java.util.concurrent.ConcurrentMap;
 
 public class MessageListener extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(MessageListener.class);
-    private static final String BOT_START_COMMAND = "!클로이봇 시작";
-    private static final String BOT_STOP_COMMAND = "!클로이봇 종료";
-    private static final String STATUS_COMMAND = "!상태";
     private static final String CHECK_OUT_MODE = "체크아웃";
     private static final String CHECK_IN_MODE = "체크인";
     private static final String BOT_NAME = "Chloe-bot";
     private static final int ONE_DAY_IN_MILLISECONDS = 1000 * 60 * 60 * 24;
     private static final ConcurrentMap<String, String> guilds = new ConcurrentHashMap<>();
+    private static final String BOT_START_COMMAND = "!클로이봇 시작";
+    private static final String BOT_STOP_COMMAND = "!클로이봇 종료";
+    private static final String STATUS_COMMAND = "!상태";
+    private static final String NEXT_ALARM_COMMAND = "!다음 알림";
 
     private final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private Date checkIn;
+    private Date checkOut;
 
     public static void run() throws LoginException {
         String token = System.getenv("TOKEN");
@@ -45,8 +48,8 @@ public class MessageListener extends ListenerAdapter {
         switch (event.getMessage().getContentRaw()) {
             case BOT_START_COMMAND:
                 if (isValidRequest(event)) {
-                    if (!isFirstCommand(event.getGuild())) {
-                        doSendAlreadyRunMessage(event);
+                    if (isRegistered(event.getGuild())) {
+                        sendAlreadyRunMessage(event);
                         break;
                     }
                     runChloeBot(event);
@@ -61,9 +64,23 @@ public class MessageListener extends ListenerAdapter {
                 stopChloeBot(event);
                 break;
 
+            case NEXT_ALARM_COMMAND:
+                sendNextAlarmTime(event);
+                break;
+
             default:
                 // do nothing
         }
+    }
+
+    private void sendNextAlarmTime(MessageReceivedEvent event) {
+        if (!isRegistered(event.getGuild())) {
+            event.getTextChannel().sendMessage("체크인/체크아웃 알림이 설정되어있지 않습니다.").queue();
+            return;
+        }
+
+        Date nextDate = (checkIn.getTime() > checkOut.getTime()) ? checkOut : checkIn;
+        event.getTextChannel().sendMessage(nextDate.toString()).queue();
     }
 
     private void stopChloeBot(MessageReceivedEvent event) {
@@ -75,7 +92,7 @@ public class MessageListener extends ListenerAdapter {
         guilds.remove(guild.getName());
     }
 
-    private void doSendAlreadyRunMessage(@NotNull MessageReceivedEvent event) {
+    private void sendAlreadyRunMessage(@NotNull MessageReceivedEvent event) {
         event.getTextChannel().sendMessage("이미 체크인/체크아웃 알림이 등록되었습니다.").queue();
     }
 
@@ -101,8 +118,6 @@ public class MessageListener extends ListenerAdapter {
         TimerTask checkInTask = createTask(checkInTextChannel, CHECK_IN_MODE);
         TimerTask checkOutTask = createTask(checkInTextChannel, CHECK_OUT_MODE);
 
-        Date checkIn = null;
-        Date checkOut = null;
         LocalDateTime runtime = LocalDateTime.now();
 
         String checkInTime = runtime.toString().substring(0, 10) + " 10:00:00";
@@ -176,8 +191,8 @@ public class MessageListener extends ListenerAdapter {
         return isNotBotsMessage(event);
     }
 
-    private boolean isFirstCommand(Guild guild) {
-        return !guilds.containsKey(guild.getName());
+    private boolean isRegistered(Guild guild) {
+        return guilds.containsKey(guild.getName());
     }
 
     private boolean isNotBotsMessage(@NotNull MessageReceivedEvent event) {
