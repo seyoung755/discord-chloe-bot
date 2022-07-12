@@ -3,6 +3,7 @@ package com.example.discordbotspring;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -16,18 +17,23 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class MessageListener extends ListenerAdapter {
+    public static final String BOT_START_COMMAND = "!클로이봇 시작";
     private static final Logger logger = LoggerFactory.getLogger(MessageListener.class);
-    private static final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
+    private final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    public static final String CHECK_OUT_MODE = "체크아웃";
+    public static final String CHECK_IN_MODE = "체크인";
     public static final String BOT_NAME = "Chloe-bot";
+    public static final String STATUS_COMMAND = "!상태";
+    public static final int ONE_DAY_IN_MILLISECONDS = 1000 * 60 * 60 * 24;
+
     private static JDA jda;
-    private static TimerTask checkInTask;
-    private static TimerTask checkOutTask;
+    private static ConcurrentMap<String, String> guilds = new ConcurrentHashMap<>();
 
     public static void run() throws LoginException {
-
         String token = System.getenv("TOKEN");
         jda = JDABuilder.createDefault(token).build();
         jda.getPresence().setStatus(OnlineStatus.ONLINE);
@@ -36,75 +42,114 @@ public class MessageListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-
-        if (isValidRequest(event)) {
-            TextChannel textChannel = event.getGuild().getTextChannelsByName("✅체크인-체크아웃", true).get(0);
-
-            textChannel.sendMessage("체크인/체크아웃 알림을 시작합니다.").queue();
-            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
-            Calendar instance = Calendar.getInstance();
-            System.out.println(instance.getTimeZone());
-
-            Calendar calendar = Calendar.getInstance();
-
-            checkInTask = new TimerTask(){
-                public void run(){
-
-                    int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-
-                    if (isWeekend(dayOfWeek)) {
-                        logger.info("주말은 쉬어야죠", dayOfWeek);
-                        return;
+        switch (event.getMessage().getContentRaw()) {
+            case BOT_START_COMMAND:
+                if (isValidRequest(event)) {
+                    if (!isFirstCommand(event.getGuild())) {
+                        doSendAlreadyRunMessage(event);
+                        break;
                     }
-
-                    LocalDateTime now = LocalDateTime.now();
-
-                    String dateString = now.toString();
-                    String month = dateString.substring(5, 7);
-                    String day = dateString.substring(8, 10);
-                    textChannel.sendMessage(month + "월 " + day + "일 체크인 시간입니다~ 스레드에 체크인 댓글을 남겨주세요!").queue();
+                    doRunChloeBot(event);
                 }
-            };
+                break;
 
-            checkOutTask = new TimerTask() {
-                @Override
-                public void run() {
-                    int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-
-                    if (isWeekend(dayOfWeek)) {
-                        logger.info("주말은 쉬어야죠", dayOfWeek);
-                        return;
-                    }
-
-                    LocalDateTime now = LocalDateTime.now();
-
-                    String dateString = now.toString();
-                    String month = dateString.substring(5, 7);
-                    String day = dateString.substring(8, 10);
-                    textChannel.sendMessage(month + "월 " + day + "일 체크아웃 시간입니다~ 스레드에 체크아웃 댓글을 남겨주세요!").queue();
-                }
-            };
-
-            Date checkIn = null;
-            Date checkOut = null;
-            LocalDateTime runtime = LocalDateTime.now();
-
-            try {
-                checkIn = dateFormatter.parse(runtime.toString().substring(0, 10) + " 10:00:00");
-                checkOut = dateFormatter.parse(runtime.toString().substring(0, 10) + " 18:00:00");
-            } catch (ParseException e) {
-                e.printStackTrace();
-            }
-
-            //Now create the time and schedule it
-            Timer timer = new Timer();
-
-            //Use this if you want to execute it once
-            timer.scheduleAtFixedRate(checkInTask, checkIn, 1000*60*60*24);
-            timer.scheduleAtFixedRate(checkOutTask, checkOut, 1000*60*60*24);
-        } else if (event.getMessage().getContentRaw().equals("!상태")) {
-            event.getTextChannel().sendMessage("정상 작동중입니다").queue();
+            case STATUS_COMMAND:
+                doStatusCheck(event);
+                break;
         }
+    }
+
+    private void doSendAlreadyRunMessage(@NotNull MessageReceivedEvent event) {
+        event.getTextChannel().sendMessage("이미 체크인/체크아웃 알림이 등록되었습니다.").queue();
+    }
+
+    private void doStatusCheck(@NotNull MessageReceivedEvent event) {
+        event.getTextChannel().sendMessage("정상 작동중입니다. 봇의 주인 : " + System.getProperty("user.name")).queue();
+    }
+
+    private void doRunChloeBot(@NotNull MessageReceivedEvent event) {
+
+        setTimeZone();
+        Guild guild = event.getGuild();
+
+        registerGuild(guild);
+
+        TextChannel checkInTextChannel = guild.getTextChannelsByName("✅체크인-체크아웃", true).get(0);
+        TextChannel targetTextChannel = event.getTextChannel();
+
+        targetTextChannel.sendMessage("체크인/체크아웃 알림을 시작합니다.").queue();
+
+        Calendar instance = Calendar.getInstance();
+        logger.info("Time zone: {}", instance.getTimeZone());
+
+        TimerTask checkInTask = createTask(checkInTextChannel, CHECK_IN_MODE);
+        TimerTask checkOutTask = createTask(checkInTextChannel, CHECK_OUT_MODE);
+
+        Date checkIn = null;
+        Date checkOut = null;
+        LocalDateTime runtime = LocalDateTime.now();
+
+        String checkInTime = runtime.toString().substring(0, 10) + " 10:00:00";
+        String checkOutTime = runtime.toString().substring(0, 10) + " 18:00:00";
+
+        try {
+            checkIn = calculateInitialDate(checkInTime);
+            checkOut = calculateInitialDate(checkOutTime);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+        Timer timer = new Timer();
+
+        timer.scheduleAtFixedRate(checkInTask, checkIn, ONE_DAY_IN_MILLISECONDS);
+        timer.scheduleAtFixedRate(checkOutTask, checkOut, ONE_DAY_IN_MILLISECONDS);
+    }
+
+    private Date calculateInitialDate(String time) throws ParseException {
+        Date date = dateFormatter.parse(time);
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+
+        if (date.getTime() < new Date().getTime()) {
+            cal.add(Calendar.DAY_OF_YEAR, 1);
+        }
+
+        logger.info("time: {}", cal.getTime().toString());
+
+        return cal.getTime();
+    }
+
+    private void registerGuild(Guild guild) {
+        guilds.put(guild.getName(), guild.getName());
+        guilds.keySet().forEach(key -> logger.info("guilds : {}", key));
+    }
+
+    private static void setTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
+    }
+
+    @NotNull
+    private TimerTask createTask(TextChannel textChannel, String mode) {
+        return new TimerTask() {
+            public void run() {
+                Calendar calendar = Calendar.getInstance();
+
+                int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+
+                if (isWeekend(dayOfWeek)) {
+                    logger.info("주말은 쉬어야죠, {}", dayOfWeek);
+                    return;
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+
+                String dateString = now.toString();
+                String month = dateString.substring(5, 7);
+                String day = dateString.substring(8, 10);
+                textChannel.sendMessage(month + "월 " + day + "일 " + mode +
+                        "시간입니다~ 스레드에 체크인 댓글을 남겨주세요!");
+            }
+        };
     }
 
     private boolean isWeekend(int dayOfWeek) {
@@ -112,41 +157,15 @@ public class MessageListener extends ListenerAdapter {
     }
 
     private boolean isValidRequest(@NotNull MessageReceivedEvent event) {
-        return isNotBotsMessage(event) && isStartMessage(event) && isFirstCommand(checkInTask);
+        return isNotBotsMessage(event);
     }
 
-    private boolean isStartMessage(MessageReceivedEvent event) {
-        return event.getMessage().getContentRaw().equals("!클로이봇 시작");
+    private boolean isFirstCommand(Guild guild) {
+        return !guilds.containsKey(guild.getName());
     }
-
-    private boolean isFirstCommand(TimerTask task) {
-        return Objects.isNull(task);
-    }
-
 
     private boolean isNotBotsMessage(@NotNull MessageReceivedEvent event) {
         return !event.getAuthor().getName().equals(BOT_NAME);
     }
 
-//    private long calcTaskTime(int startTime) {
-//
-//        if(startTime > 23 || startTime < 0){
-//            return 0;
-//        }
-//        Calendar calendar = new GregorianCalendar(Locale.KOREA);
-//        calendar.set(Calendar.HOUR_OF_DAY, startTime);
-//        calendar.set(Calendar.MINUTE, 6);
-//        calendar.set(Calendar.SECOND, 0);
-//
-//        long nowDate = new Date().getTime();
-//
-//        if (nowDate > calendar.getTime().getTime()) {
-//            calendar.add(Calendar.DAY_OF_YEAR, 1);
-//        }
-//        long waiting = (calendar.getTime().getTime() - nowDate)/1000;
-//        logger.info("Schedule Start Time : " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(calendar.getTime()));
-//        logger.info("Waiting : " + waiting+" sec");
-//
-//        return (int)waiting;
-//    }
 }
