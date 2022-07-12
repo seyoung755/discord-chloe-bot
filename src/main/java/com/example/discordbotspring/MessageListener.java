@@ -180,6 +180,17 @@ public class MessageListener extends ListenerAdapter {
                 String day = dateString.substring(8, 10);
                 textChannel.sendMessage(month + "월 " + day + "일 " + mode +
                         "시간입니다~ 스레드에 체크인 댓글을 남겨주세요!").queue();
+
+                if (mode.equals(CHECK_IN_MODE)) {
+                    calendar.setTime(checkIn);
+                    calendar.add(Calendar.DATE, 1);
+                    checkIn = calendar.getTime();
+                    return;
+                }
+
+                calendar.setTime(checkOut);
+                calendar.add(Calendar.DATE, 1);
+                checkOut = calendar.getTime();
             }
         };
     }
