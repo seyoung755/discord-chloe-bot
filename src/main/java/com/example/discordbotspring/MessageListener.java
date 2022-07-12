@@ -102,6 +102,8 @@ public class MessageListener extends ListenerAdapter {
             //Use this if you want to execute it once
             timer.scheduleAtFixedRate(checkInTask, checkIn, 1000*60*60*24);
             timer.scheduleAtFixedRate(checkOutTask, checkOut, 1000*60*60*24);
+        } else if (event.getMessage().getContentRaw().equals("!상태")) {
+            event.getTextChannel().sendMessage("정상 작동중입니다").queue();
         }
     }
 
