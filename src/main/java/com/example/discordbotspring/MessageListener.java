@@ -137,6 +137,7 @@ public class MessageListener extends ListenerAdapter {
     }
 
     private Date calculateInitialDate(String time) throws ParseException {
+        setTimeZone();
         Date date = dateFormatter.parse(time);
         Calendar cal = Calendar.getInstance();
         cal.setTime(date);
