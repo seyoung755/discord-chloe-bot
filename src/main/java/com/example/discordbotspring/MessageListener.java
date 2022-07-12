@@ -21,17 +21,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public class MessageListener extends ListenerAdapter {
-    public static final String BOT_START_COMMAND = "!클로이봇 시작";
     private static final Logger logger = LoggerFactory.getLogger(MessageListener.class);
-    public static final String BOT_STOP_COMMAND = "!클로이봇 종료";
-    private final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    public static final String CHECK_OUT_MODE = "체크아웃";
-    public static final String CHECK_IN_MODE = "체크인";
-    public static final String BOT_NAME = "Chloe-bot";
-    public static final String STATUS_COMMAND = "!상태";
-    public static final int ONE_DAY_IN_MILLISECONDS = 1000 * 60 * 60 * 24;
-
+    private static final String BOT_START_COMMAND = "!클로이봇 시작";
+    private static final String BOT_STOP_COMMAND = "!클로이봇 종료";
+    private static final String STATUS_COMMAND = "!상태";
+    private static final String CHECK_OUT_MODE = "체크아웃";
+    private static final String CHECK_IN_MODE = "체크인";
+    private static final String BOT_NAME = "Chloe-bot";
+    private static final int ONE_DAY_IN_MILLISECONDS = 1000 * 60 * 60 * 24;
     private static final ConcurrentMap<String, String> guilds = new ConcurrentHashMap<>();
+
+    private final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     public static void run() throws LoginException {
         String token = System.getenv("TOKEN");
