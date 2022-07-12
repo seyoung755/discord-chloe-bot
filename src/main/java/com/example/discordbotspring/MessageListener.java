@@ -142,8 +142,8 @@ public class MessageListener extends ListenerAdapter {
         Calendar cal = Calendar.getInstance();
         cal.setTime(date);
 
-        if (date.getTime() < new Date().getTime()) {
-            cal.add(Calendar.DAY_OF_YEAR, 1);
+        if (date.getTime() < cal.getTime().getTime()) {
+            cal.add(Calendar.DATE, 1);
         }
 
         logger.info("time: {}", cal.getTime());
