@@ -3,6 +3,7 @@ package com.example.discordbotspring;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
@@ -20,6 +21,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static net.dv8tion.jda.api.entities.Activity.ActivityType.*;
+
 public class MessageListener extends ListenerAdapter {
     private static final Logger logger = LoggerFactory.getLogger(MessageListener.class);
     private static final String CHECK_OUT_MODE = "체크아웃";
@@ -33,29 +36,24 @@ public class MessageListener extends ListenerAdapter {
     private static final String NEXT_ALARM_COMMAND = "!다음 알림";
 
     private final DateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static JDA jda;
     private Date checkIn;
     private Date checkOut;
 
     public static void run() throws LoginException {
         String token = System.getenv("TOKEN");
-        JDA jda = JDABuilder.createDefault(token).build();
+        jda = JDABuilder.createDefault(token).build();
         jda.getPresence().setStatus(OnlineStatus.ONLINE);
         jda.addEventListener(new MessageListener());
     }
 
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-        switch (event.getMessage().getContentRaw()) {
-            case BOT_START_COMMAND:
-                if (isValidRequest(event)) {
-                    if (isRegistered(event.getGuild())) {
-                        sendAlreadyRunMessage(event);
-                        break;
-                    }
-                    runChloeBot(event);
-                }
-                break;
 
+        if (!isRegistered(event.getGuild())) {
+            runChloeBot(event);
+        }
+        switch (event.getMessage().getContentRaw()) {
             case STATUS_COMMAND:
                 checkStatus(event);
                 break;
@@ -86,6 +84,7 @@ public class MessageListener extends ListenerAdapter {
     private void stopChloeBot(MessageReceivedEvent event) {
         disableGuild(event.getGuild());
         event.getTextChannel().sendMessage("체크인/체크아웃 알림을 종료합니다.").queue();
+        jda.getPresence().setActivity(Activity.of(DEFAULT, "휴식"));
     }
 
     private void disableGuild(Guild guild) {
@@ -108,9 +107,10 @@ public class MessageListener extends ListenerAdapter {
         registerGuild(guild);
 
         TextChannel checkInTextChannel = guild.getTextChannelsByName("✅체크인-체크아웃", true).get(0);
-        TextChannel targetTextChannel = event.getTextChannel();
+//        TextChannel targetTextChannel = event.getTextChannel();
 
-        targetTextChannel.sendMessage("체크인/체크아웃 알림을 시작합니다.").queue();
+//        targetTextChannel.sendMessage("체크인/체크아웃 알림을 시작합니다.").queue();
+        jda.getPresence().setActivity(Activity.of(DEFAULT, "체크인/체크아웃 알림"));
 
         Calendar instance = Calendar.getInstance();
         logger.info("Time zone: {}", instance.getTimeZone());
@@ -151,7 +151,7 @@ public class MessageListener extends ListenerAdapter {
         return cal.getTime();
     }
 
-    private void registerGuild(Guild guild) {
+    private static void registerGuild(Guild guild) {
         guilds.put(guild.getName(), guild.getName());
         guilds.keySet().forEach(key -> logger.info("guilds : {}", key));
     }
@@ -179,7 +179,7 @@ public class MessageListener extends ListenerAdapter {
                 String month = dateString.substring(5, 7);
                 String day = dateString.substring(8, 10);
                 textChannel.sendMessage(month + "월 " + day + "일 " + mode +
-                        "시간입니다~ 스레드에 체크인 댓글을 남겨주세요!").queue();
+                        "시간입니다~ 스레드에 "+ mode + " 댓글을 남겨주세요!").queue();
 
                 if (mode.equals(CHECK_IN_MODE)) {
                     calendar.setTime(checkIn);
